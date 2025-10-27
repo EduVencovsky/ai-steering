@@ -16,7 +16,7 @@ This structure helps focus on the **user’s need** rather than the system’s i
 
 **Example:**
 
-> As a user, I want to add new TODO items, so that I can track tasks I need to complete.
+> As a user, I want to add new FOO items, so that I can track tasks I need to complete.
 
 ---
 
@@ -46,6 +46,8 @@ This ensures that requirements are clear, testable, and unambiguous.
 Each **user story** must be followed by a list of **acceptance criteria** that describe how the system will fulfill the user’s need.
 Together, they ensure the requirement is **complete, understandable, and testable**.
 
+A single doc can have multiple requirements.
+
 **Structure:**
 
 ```md
@@ -67,30 +69,30 @@ Together, they ensure the requirement is **complete, understandable, and testabl
 **Example:**
 
 ```md
-# TODO List
+# FOO List
 
-A TODO List that can add, update, delete and mark TODO items as comples
+A FOO List that can add, update, delete and mark FOO items as comples
 
 ## Requirement 1
 
 **User Story:**
-As a user, I want to add new TODO items, so that I can track tasks I need to complete.
+As a user, I want to add new FOO items, so that I can track tasks I need to complete.
 
 **Acceptance Criteria:**
 
-1. WHEN the user enters task text and submits, THE SYTEM SHALL create a new todo item with the provided task text.
-2. WHEN a new todo item is created, THE SYTEM SHALL set the completion status to false.
-3. THE SYTEM SHALL display the new todo item in the task list immediately after creation.
+1. WHEN the user enters task text and submits, THE SYTEM SHALL create a new FOO item with the provided task text.
+2. WHEN a new FOO item is created, THE SYTEM SHALL set the completion status to false.
+3. THE SYTEM SHALL display the new FOO item in the task list immediately after creation.
 4. WHEN the user submits an empty task text, THE SYTEM SHALL prevent creation and display an error message.
 
 ## Requirement 2
 
-**User Story:** As a user, I want to update existing TODO items, so that I can modify task details or mark them as complete.
+**User Story:** As a user, I want to update existing FOO items, so that I can modify task details or mark them as complete.
 
 **Acceptance Criteria:**
 
-1. WHEN the user selects a TODO item for editing, THE SYSTEM SHALL display the current task text in an editable field.
-2. WHEN the user modifies the task text and saves, THE SYSTEM SHALL update the TODO item with the new content.
+1. WHEN the user selects a FOO item for editing, THE SYSTEM SHALL display the current task text in an editable field.
+2. WHEN the user modifies the task text and saves, THE SYSTEM SHALL update the FOO item with the new content.
 3. WHEN the user toggles the completion status, THE SYSTEM SHALL update and save the new status.
-4. THE SYSTEM SHALL visually distinguish completed TODO items (e.g., with a checkmark or strike-through) from pending ones.
+4. THE SYSTEM SHALL visually distinguish completed FOO items (e.g., with a checkmark or strike-through) from pending ones.
 ```

@@ -1,0 +1,21 @@
+{
+  "name": "ai-steering",
+  "version": "1.0.0",
+  "description": "My Common Steering Files for AI",
+  "homepage": "https://github.com/EduVencovsky/ai-steering#readme",
+  "bugs": {
+    "url": "https://github.com/EduVencovsky/ai-steering/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EduVencovsky/ai-steering.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "concat-md": "node concat-md.js ./.kiro/steering ./all.md"
+  }
+}

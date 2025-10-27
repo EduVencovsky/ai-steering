@@ -2,29 +2,24 @@
 
 When implementing a UI with React, you must divide it into the following files:
 
-1. [File for the API data types](#file-for-the-api-data-types)
-2. [File for making the API call](#separate-file-for-making-the-api-call)
-3. [File for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
-4. [File for React component that renders visual elements and receives the state or data](#react-component-that-renders-visual-elements-and-receives-the-state-or-data)
-5. [File for React component that handles the state and API data](#react-component-that-handles-the-state-and-api-data)
+1. [File for making the API call](#separate-file-for-making-the-api-call)
+2. [File for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
+3. [File for React component that renders visual elements and receives the state or data](#react-component-that-renders-visual-elements-and-receives-the-state-or-data)
+4. [File for React component that handles the state and API data](#react-component-that-handles-the-state-and-api-data)
 
 For example:
 
-## File for the API data types
+## Separate file for making the API call
 
-This file should contain the exports for the data types
+Follow "Make a separate file for the function that makes the API call": #[[file:.kiro/steering/rules/react-query.md]]
+
+This file should also export the API data interfaces and types
 
 ```typescript
 export interface Foo {
   // ...
 }
 ```
-
-## Separate file for making the API call
-
-Follow "Make a separate file for the function that makes the API call": #[[file:.kiro/steering/rules/react-query.md]]
-
-It should use the files from the API data types
 
 ## Hook for handling API logic with react-query
 

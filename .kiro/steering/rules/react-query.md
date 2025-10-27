@@ -14,6 +14,14 @@ You should follow the same standard from what is already being used in the proje
 Example:
 
 ```ts
+export interface Foo {
+  /* ... */
+}
+
+export interface Bar {
+  /* ... */
+}
+
 export const getFoo = async (id: string): Promise<Foo> => {
   // Using `fetch` is just an example, use what is already being used to make API calls in the project
   const res = await fetch(`https://api.example.com/foo/${id}`);
