@@ -1,4 +1,6 @@
-# Typescript Best Practices
+# Typescript Guidelines
+
+When using typescript, follow these guidelines
 
 ## Do not use `any`
 

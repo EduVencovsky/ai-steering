@@ -1,4 +1,4 @@
-# Error handling
+# Error Handling Guidelines
 
 When handling errors, follow these guidelines
 

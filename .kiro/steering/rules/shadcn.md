@@ -1,6 +1,6 @@
-# Shadcn
+# Shadcn Guidelines
 
-Use shadcn for the UI components.
+When using shadcn, follow these guidelines
 
 ## Importing components
 
@@ -10,4 +10,12 @@ Example:
 
 ```tsx
 import { Foo } from "@/components/ui/foo";
+```
+
+## Command to add new components
+
+If you need to add a new component, use the following command:
+
+```bash
+npx shadcn@latest add <component-name>
 ```

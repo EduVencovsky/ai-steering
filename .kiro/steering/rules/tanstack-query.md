@@ -3,7 +3,8 @@
 When using `@tanstack/react-query`, make sure that you follow these guidelines
 
 1. Make a separate file for the function that makes the API call
-1. Create a separate file for each `useQuery` or `useMutation` hook and use `queryOptions` for `useQuery`
+1. Create a separate file for each `useQuery` or `useMutation` hook
+1. Use `queryOptions` for `useQuery`
 
 ## Make a separate file for the function that makes the API call
 

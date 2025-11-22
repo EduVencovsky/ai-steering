@@ -16,6 +16,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "concat-md": "node concat-md.js ./.kiro/steering ./all.md"
+    "concat-md": "node concat-md.js ./.kiro/steering ./all.md",
+    "concat-md-rules": "node concat-md.js ./.kiro/steering/rules ./all-rules.md"
   }
 }
