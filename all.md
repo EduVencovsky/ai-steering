@@ -1,8 +1,12 @@
 
 
-# React Component Structure
+# React Firebase Project Guidelines
+
+Follow all of these guidelines:
 
 ## Libraries
+
+In this project, you will be using the following libraries:
 
 - `react`
 - `zod`
@@ -16,32 +20,76 @@
 
 ## File structure
 
+- `api`:
+  - `**/*`: [Files for making the API call](#separate-file-for-making-the-api-call)
+- `components`:
+  - `ui`: Contains `shadcn` components
+  - `*.tsx`:
+- `context-providers`
+  - `*.tsx`: Contains context providers
+- `hooks`
+  - `**/*.tsx`: Contains application hooks and react query hooks [files for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
+- `model`
+  - `**/*.ts`: Contains firebase collections and zod schema
+- `routes`
+  - `**/*.tsx`: Contains files with routes from `@tanstack/react-router`
+
 When implementing a UI with React, you must divide it into the following files:
 
+1. [File for defining the models and firebase collections](#file-for-defining-the-models-and-firebase-collections)
 1. [File for making the API call](#separate-file-for-making-the-api-call)
-2. [File for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
-3. [File for React component that renders visual elements and receives the state or data](#react-component-that-renders-visual-elements-and-receives-the-state-or-data)
-4. [File for React component that handles the state and API data](#react-component-that-handles-the-state-and-api-data)
+1. [File for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
+1. [File for React component that renders visual elements and receives the state or data](#react-component-that-renders-visual-elements-and-receives-the-state-or-data)
+1. [File for React component that handles the state and API data](#react-component-that-handles-the-state-and-api-data)
 
-### Separate file for making the API call
+### File for defining the models and firebase collections
 
-Follow "Make a separate file for the function that makes the API call": #[[file:.kiro/steering/rules/tanstack-query.md]]
+For each firebase collection create a separate file with a zod schema for the data that will be stored in the collection.
 
-This file should also export the API data interfaces and types
+There must be a function declared to be reused that will make the collection typed and validated with zod.
+
+Like:
 
 ```typescript
-export interface Foo {
-  // ...
+export function typedCollection<
+  Schema extends z.ZodTypeAny<DocumentData, DocumentData>
+>(db: Firestore, path: string, schema: Schema) {
+  return collection(db, path).withConverter<z.infer<Schema>>({
+    toFirestore: (data) => schema.parse(data),
+    fromFirestore: (snap) => {
+      return schema.parse({ ...snap.data() });
+    },
+  });
 }
 ```
 
-### Hook for handling API logic with react-query
+In each collection file, you will define a schema for the input which doesn't contain the ID and the type for with the ID
+
+For example:
+
+```typescript
+export const FooInputSchema = z.object({
+  bar: z.string(),
+  baz: z.string(),
+});
+
+export type FooInput = z.infer<typeof FooInputSchema>;
+export type Foo = FooInput & { id: string };
+
+export const fooCol = typedCollection(db, "foo", FooInputSchema);
+```
+
+### File for making the API call
+
+Follow "Make a separate file for the function that makes the API call: #[[file:.kiro/steering/rules/tanstack-query.md]]
+
+### File for the Hook that handles the API logic with React Query
 
 Follow "Create a separate file for each `useQuery` or `useMutation` hook and use `queryOptions` for `useQuery`": #[[file:.kiro/steering/rules/tanstack-query.md]]
 
 It should use the files from the API data types
 
-### React component that renders visual elements and receives the state or data
+### File for React component that renders visual elements and receives the state or data
 
 A presentational component focused only on rendering UI elements based on the props it receives.
 
@@ -105,20 +153,12 @@ Follow this logic:
 
 ## How to handle Forms and API calls from firestore
 
-Firestore data can be unstructured and nothing guarantees that it will return the correct data.
-
-So when you make an API call to Firestore, you should always validate the data that comes back from it. To do this, you should use `zod` to define the shape of the data that comes back from Firestore.
+When making an API calls, always use the types from the model.
 
 Example:
 
 ```ts
-export const fooSchema = z.object({
-  id: z.string(),
-  bar: z.string(),
-  baz: z.number(),
-});
-export type Foo = z.infer<typeof fooSchema>;
-
+// Use types from model
 const getFoo = async (id: string): Foo | null => {
   const docRef = doc(db, "foo", id);
   const docSnap = await getDoc(docRef);
@@ -127,24 +167,11 @@ const getFoo = async (id: string): Foo | null => {
     return null;
   }
 
-  const data = docSnap.data();
-  const { success, data, error } = fooSchema.safeParse({ ...data, id });
-
-  if (success) {
-    return data;
-  }
-
-  console.error(error);
-  return null;
+  return { ...data, id };
 };
 
-export const createFooSchema = z.object({
-  bar: z.string(),
-  baz: z.number(),
-});
-export type CreateFoo = z.infer<typeof createFooSchema>;
-
-const createFoo = (foo: CreateFoo): Foo => {
+// Use input and return types from model
+const createFoo = (foo: FooInput): Foo => {
   const docRef = await addDoc(collection(db, "foo"), foo);
   return { id: docRef.id, ...foo };
 };
@@ -158,8 +185,8 @@ Example:
 // Hook imported from different file that uses @tanstack/react-query mutation hook and calls createFoo API
 const createFoo = useCreatFoo();
 
-const { handleSubmit, register, formState } = useForm<CreateFoo>({
-  resolver: zodResolver(createFooSchema),
+const { handleSubmit, register, formState } = useForm<Foo>({
+  resolver: zodResolver(fooSchema),
 });
 
 const onSubmit = handleSubmit(async (data) => {
@@ -168,7 +195,7 @@ const onSubmit = handleSubmit(async (data) => {
 });
 ```
 
-And when needing to define some typescript type that is refering to the API data, always import the type that is generated from the `zod` schema.
+And when needing to define some typescript type that is refering to the API data, always import the type from the model that is generated by the zod schema
 
 # **Guidelines for Writing Requirement Documents**
 
@@ -269,6 +296,26 @@ As a user, I want to add new FOO items, so that I can track tasks I need to comp
 4. THE SYSTEM SHALL visually distinguish completed FOO items (e.g., with a checkmark or strike-through) from pending ones.
 ```
 
+# Coding guidelines
+
+For code you write, follow these guidelines
+
+## Do not shorten variable names
+
+When declaring a varible, always put the entire name. Do not shorten variable names.
+
+Wrong example:
+
+```ts
+listC = ["..."];
+```
+
+Correct example:
+
+```ts
+listContent = ["..."];
+```
+
 # Guidelines for writing documents
 
 For every comment you write, follow these guidelines
@@ -280,6 +327,20 @@ Do not put comments in the middle of the code that explains the "what" or "how" 
 ## Always add JSDocs to export functions
 
 Always add propert JSDocs documentation to exporter functions and react components
+
+## Do not write comments on every line of the code
+
+Do not write comments on every line of the code. Only write comments on the code that is not self-explanatory.
+
+Wrong example:
+
+```js
+// This is a comment
+const foo = () => {
+  // This is another comment
+  return "bar";
+};
+```
 
 # Error Handling Guidelines
 
@@ -412,6 +473,67 @@ When using `react-hook-form`, always follow these guidelines
 
 ## Always use `useWatch` over `watch`
 
+`watch` is a function that returns the current value of a form field. It is not a reactive value, so it is not updated when the value changes. This means that if you want to use the value of a form field in a component, you need to use `useWatch` instead of `watch`. `useWatch` is a hook that returns a reactive value, so it is updated when the value changes.
+
+Wrong example:
+
+```tsx
+const { control, watch } = useForm();
+
+const values = watch();
+```
+
+Correct example:
+
+```tsx
+const { control, watch } = useForm();
+
+const name = useWatch({ control, name: "name" }); // This will update when the value changes
+```
+
+## Always use `useWatch` with the specific fields you want instead of all fields
+
+Always use `useWatch` with the specific fields you want instead of all fields so the componnet doesn't rerender when all field changes, but only the fields you really need.
+
+Wrong example:
+
+```tsx
+const { control, watch } = useForm();
+
+const values = useWatch({ control });
+```
+
+Correct example:
+
+```tsx
+const { control, watch } = useForm();
+
+const name = useWatch({ control, name: "name" }); // Pass the specific fields you want to watch
+```
+
+# React guidelines
+
+When using `react`, always follow these guidelines
+
+## How to strucutre files for React components
+
+Never put 2 react components in the same file. Always have a single component per file.
+
+In the component file, always use named exports and always export the component props
+
+Correct example:
+
+```tsx
+// Foo.tsx
+export interface FooProps {
+  id: string;
+}
+
+export const Foo = ({ id }: FooProps) => {
+  // ...
+};
+```
+
 # Shadcn Guidelines
 
 When using shadcn, follow these guidelines
@@ -426,12 +548,25 @@ Example:
 import { Foo } from "@/components/ui/foo";
 ```
 
+## Always use Shadcn components
+
+Always use shadcn components. Do not render raw html or raw css if you have a shadcn component available for it,
+If a component is not available in the code base, but it does exist in the shadcn library, run the command to add the component and use it.
+
 ## Command to add new components
 
 If you need to add a new component, use the following command:
 
 ```bash
 npx shadcn@latest add <component-name>
+```
+
+## Command to see available components
+
+Run the following command to see available components to add:
+
+```bash
+npx shadcn@latest list @shadcn
 ```
 
 # React Query Guidelines
@@ -451,14 +586,6 @@ You should follow the same standard from what is already being used in the proje
 Example:
 
 ```ts
-export interface Foo {
-  /* ... */
-}
-
-export interface Bar {
-  /* ... */
-}
-
 export const getFoo = async (id: string): Promise<Foo> => {
   // Using `fetch` is just an example, use what is already being used to make API calls in the project
   const res = await fetch(`https://api.example.com/foo/${id}`);

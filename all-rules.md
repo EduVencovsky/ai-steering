@@ -1,5 +1,25 @@
 
 
+# Coding guidelines
+
+For code you write, follow these guidelines
+
+## Do not shorten variable names
+
+When declaring a varible, always put the entire name. Do not shorten variable names.
+
+Wrong example:
+
+```ts
+listC = ["..."];
+```
+
+Correct example:
+
+```ts
+listContent = ["..."];
+```
+
 # Guidelines for writing documents
 
 For every comment you write, follow these guidelines
@@ -11,6 +31,20 @@ Do not put comments in the middle of the code that explains the "what" or "how" 
 ## Always add JSDocs to export functions
 
 Always add propert JSDocs documentation to exporter functions and react components
+
+## Do not write comments on every line of the code
+
+Do not write comments on every line of the code. Only write comments on the code that is not self-explanatory.
+
+Wrong example:
+
+```js
+// This is a comment
+const foo = () => {
+  // This is another comment
+  return "bar";
+};
+```
 
 # Error Handling Guidelines
 
@@ -143,6 +177,67 @@ When using `react-hook-form`, always follow these guidelines
 
 ## Always use `useWatch` over `watch`
 
+`watch` is a function that returns the current value of a form field. It is not a reactive value, so it is not updated when the value changes. This means that if you want to use the value of a form field in a component, you need to use `useWatch` instead of `watch`. `useWatch` is a hook that returns a reactive value, so it is updated when the value changes.
+
+Wrong example:
+
+```tsx
+const { control, watch } = useForm();
+
+const values = watch();
+```
+
+Correct example:
+
+```tsx
+const { control, watch } = useForm();
+
+const name = useWatch({ control, name: "name" }); // This will update when the value changes
+```
+
+## Always use `useWatch` with the specific fields you want instead of all fields
+
+Always use `useWatch` with the specific fields you want instead of all fields so the componnet doesn't rerender when all field changes, but only the fields you really need.
+
+Wrong example:
+
+```tsx
+const { control, watch } = useForm();
+
+const values = useWatch({ control });
+```
+
+Correct example:
+
+```tsx
+const { control, watch } = useForm();
+
+const name = useWatch({ control, name: "name" }); // Pass the specific fields you want to watch
+```
+
+# React guidelines
+
+When using `react`, always follow these guidelines
+
+## How to strucutre files for React components
+
+Never put 2 react components in the same file. Always have a single component per file.
+
+In the component file, always use named exports and always export the component props
+
+Correct example:
+
+```tsx
+// Foo.tsx
+export interface FooProps {
+  id: string;
+}
+
+export const Foo = ({ id }: FooProps) => {
+  // ...
+};
+```
+
 # Shadcn Guidelines
 
 When using shadcn, follow these guidelines
@@ -157,12 +252,25 @@ Example:
 import { Foo } from "@/components/ui/foo";
 ```
 
+## Always use Shadcn components
+
+Always use shadcn components. Do not render raw html or raw css if you have a shadcn component available for it,
+If a component is not available in the code base, but it does exist in the shadcn library, run the command to add the component and use it.
+
 ## Command to add new components
 
 If you need to add a new component, use the following command:
 
 ```bash
 npx shadcn@latest add <component-name>
+```
+
+## Command to see available components
+
+Run the following command to see available components to add:
+
+```bash
+npx shadcn@latest list @shadcn
 ```
 
 # React Query Guidelines
@@ -182,14 +290,6 @@ You should follow the same standard from what is already being used in the proje
 Example:
 
 ```ts
-export interface Foo {
-  /* ... */
-}
-
-export interface Bar {
-  /* ... */
-}
-
 export const getFoo = async (id: string): Promise<Foo> => {
   // Using `fetch` is just an example, use what is already being used to make API calls in the project
   const res = await fetch(`https://api.example.com/foo/${id}`);

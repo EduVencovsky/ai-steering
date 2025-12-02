@@ -1,6 +1,10 @@
-# React Component Structure
+# React Firebase Project Guidelines
+
+Follow all of these guidelines:
 
 ## Libraries
+
+In this project, you will be using the following libraries:
 
 - `react`
 - `zod`
@@ -14,32 +18,76 @@
 
 ## File structure
 
+- `api`:
+  - `**/*`: [Files for making the API call](#separate-file-for-making-the-api-call)
+- `components`:
+  - `ui`: Contains `shadcn` components
+  - `*.tsx`:
+- `context-providers`
+  - `*.tsx`: Contains context providers
+- `hooks`
+  - `**/*.tsx`: Contains application hooks and react query hooks [files for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
+- `model`
+  - `**/*.ts`: Contains firebase collections and zod schema
+- `routes`
+  - `**/*.tsx`: Contains files with routes from `@tanstack/react-router`
+
 When implementing a UI with React, you must divide it into the following files:
 
+1. [File for defining the models and firebase collections](#file-for-defining-the-models-and-firebase-collections)
 1. [File for making the API call](#separate-file-for-making-the-api-call)
-2. [File for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
-3. [File for React component that renders visual elements and receives the state or data](#react-component-that-renders-visual-elements-and-receives-the-state-or-data)
-4. [File for React component that handles the state and API data](#react-component-that-handles-the-state-and-api-data)
+1. [File for the Hook that handles the API logic with React Query](#hook-for-handling-api-logic-with-react-query)
+1. [File for React component that renders visual elements and receives the state or data](#react-component-that-renders-visual-elements-and-receives-the-state-or-data)
+1. [File for React component that handles the state and API data](#react-component-that-handles-the-state-and-api-data)
 
-### Separate file for making the API call
+### File for defining the models and firebase collections
 
-Follow "Make a separate file for the function that makes the API call": #[[file:.kiro/steering/rules/tanstack-query.md]]
+For each firebase collection create a separate file with a zod schema for the data that will be stored in the collection.
 
-This file should also export the API data interfaces and types
+There must be a function declared to be reused that will make the collection typed and validated with zod.
+
+Like:
 
 ```typescript
-export interface Foo {
-  // ...
+export function typedCollection<
+  Schema extends z.ZodTypeAny<DocumentData, DocumentData>
+>(db: Firestore, path: string, schema: Schema) {
+  return collection(db, path).withConverter<z.infer<Schema>>({
+    toFirestore: (data) => schema.parse(data),
+    fromFirestore: (snap) => {
+      return schema.parse({ ...snap.data() });
+    },
+  });
 }
 ```
 
-### Hook for handling API logic with react-query
+In each collection file, you will define a schema for the input which doesn't contain the ID and the type for with the ID
+
+For example:
+
+```typescript
+export const FooInputSchema = z.object({
+  bar: z.string(),
+  baz: z.string(),
+});
+
+export type FooInput = z.infer<typeof FooInputSchema>;
+export type Foo = FooInput & { id: string };
+
+export const fooCol = typedCollection(db, "foo", FooInputSchema);
+```
+
+### File for making the API call
+
+Follow "Make a separate file for the function that makes the API call: #[[file:.kiro/steering/rules/tanstack-query.md]]
+
+### File for the Hook that handles the API logic with React Query
 
 Follow "Create a separate file for each `useQuery` or `useMutation` hook and use `queryOptions` for `useQuery`": #[[file:.kiro/steering/rules/tanstack-query.md]]
 
 It should use the files from the API data types
 
-### React component that renders visual elements and receives the state or data
+### File for React component that renders visual elements and receives the state or data
 
 A presentational component focused only on rendering UI elements based on the props it receives.
 
@@ -103,20 +151,12 @@ Follow this logic:
 
 ## How to handle Forms and API calls from firestore
 
-Firestore data can be unstructured and nothing guarantees that it will return the correct data.
-
-So when you make an API call to Firestore, you should always validate the data that comes back from it. To do this, you should use `zod` to define the shape of the data that comes back from Firestore.
+When making an API calls, always use the types from the model.
 
 Example:
 
 ```ts
-export const fooSchema = z.object({
-  id: z.string(),
-  bar: z.string(),
-  baz: z.number(),
-});
-export type Foo = z.infer<typeof fooSchema>;
-
+// Use types from model
 const getFoo = async (id: string): Foo | null => {
   const docRef = doc(db, "foo", id);
   const docSnap = await getDoc(docRef);
@@ -125,24 +165,11 @@ const getFoo = async (id: string): Foo | null => {
     return null;
   }
 
-  const data = docSnap.data();
-  const { success, data, error } = fooSchema.safeParse({ ...data, id });
-
-  if (success) {
-    return data;
-  }
-
-  console.error(error);
-  return null;
+  return { ...data, id };
 };
 
-export const createFooSchema = z.object({
-  bar: z.string(),
-  baz: z.number(),
-});
-export type CreateFoo = z.infer<typeof createFooSchema>;
-
-const createFoo = (foo: CreateFoo): Foo => {
+// Use input and return types from model
+const createFoo = (foo: FooInput): Foo => {
   const docRef = await addDoc(collection(db, "foo"), foo);
   return { id: docRef.id, ...foo };
 };
@@ -156,8 +183,8 @@ Example:
 // Hook imported from different file that uses @tanstack/react-query mutation hook and calls createFoo API
 const createFoo = useCreatFoo();
 
-const { handleSubmit, register, formState } = useForm<CreateFoo>({
-  resolver: zodResolver(createFooSchema),
+const { handleSubmit, register, formState } = useForm<Foo>({
+  resolver: zodResolver(fooSchema),
 });
 
 const onSubmit = handleSubmit(async (data) => {
@@ -166,4 +193,4 @@ const onSubmit = handleSubmit(async (data) => {
 });
 ```
 
-And when needing to define some typescript type that is refering to the API data, always import the type that is generated from the `zod` schema.
+And when needing to define some typescript type that is refering to the API data, always import the type from the model that is generated by the zod schema

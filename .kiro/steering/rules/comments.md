@@ -9,3 +9,17 @@ Do not put comments in the middle of the code that explains the "what" or "how" 
 ## Always add JSDocs to export functions
 
 Always add propert JSDocs documentation to exporter functions and react components
+
+## Do not write comments on every line of the code
+
+Do not write comments on every line of the code. Only write comments on the code that is not self-explanatory.
+
+Wrong example:
+
+```js
+// This is a comment
+const foo = () => {
+  // This is another comment
+  return "bar";
+};
+```
