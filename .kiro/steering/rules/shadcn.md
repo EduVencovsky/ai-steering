@@ -22,7 +22,7 @@ If a component is not available in the code base, but it does exist in the shadc
 If you need to add a new component, use the following command:
 
 ```bash
-npx shadcn@latest add <component-name>
+npx --yes shadcn@latest add <component-name>
 ```
 
 ## Command to see available components
@@ -30,5 +30,5 @@ npx shadcn@latest add <component-name>
 Run the following command to see available components to add:
 
 ```bash
-npx shadcn@latest list @shadcn
+npx --yes shadcn@latest list @shadcn
 ```
