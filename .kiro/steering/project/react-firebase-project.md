@@ -42,21 +42,52 @@ When implementing a UI with React, you must divide it into the following files:
 
 ### File for defining the models and firebase collections
 
-For each firebase collection create a separate file with a zod schema for the data that will be stored in the collection.
+For each firebase collection/doc create a separate file with a zod schema for the data that will be stored in the collection/doc.
 
-There must be a function declared to be reused that will make the collection typed and validated with zod.
+There must be a function declared to be reused that will make the collection/doc typed and validated with zod. You shouldn't recreate this, but just import it.
 
 Like:
 
 ```typescript
+const toFirestore = <
+  SchemaType extends z.infer<z.ZodTypeAny<DocumentData, DocumentData>>
+>(
+  data: SchemaType
+) => {
+  const entries = Object.entries(data).filter(([key]) => key !== "id");
+  return Object.fromEntries(entries);
+};
+
+const fromFirestore =
+  <
+    Schema extends z.ZodTypeAny<DocumentData, DocumentData>,
+    SchemaType extends z.infer<Schema>
+  >(
+    schema: SchemaType
+  ) =>
+  (snap: QueryDocumentSnapshot<DocumentData, DocumentData>) => {
+    return schema.parse({ ...snap.data(), id: snap.id });
+  };
+
 export function typedCollection<
   Schema extends z.ZodTypeAny<DocumentData, DocumentData>
 >(db: Firestore, path: string, schema: Schema) {
-  return collection(db, path).withConverter<z.infer<Schema>>({
-    toFirestore: (data) => schema.parse(data),
-    fromFirestore: (snap) => {
-      return schema.parse({ ...snap.data() });
-    },
+  type SchemaType = z.infer<Schema>;
+
+  return collection(db, path).withConverter<SchemaType>({
+    toFirestore,
+    fromFirestore: fromFirestore(schema),
+  });
+}
+
+export function typedDoc<
+  Schema extends z.ZodTypeAny<DocumentData, DocumentData>
+>(db: Firestore, path: string, schema: Schema) {
+  type SchemaType = z.infer<Schema>;
+
+  return doc(db, path).withConverter<SchemaType>({
+    toFirestore,
+    fromFirestore: fromFirestore(schema),
   });
 }
 ```
@@ -75,6 +106,11 @@ export type FooInput = z.infer<typeof FooInputSchema>;
 export type Foo = FooInput & { id: string };
 
 export const fooCol = typedCollection(db, "foo", FooInputSchema);
+export interface GetFooDocOptions {
+  id: string;
+}
+export const getFooDoc = ({ id }: GetFooDocOptions) =>
+  typedDoc(db, `foo/${id}`, FooInputSchema);
 ```
 
 ### File for making the API call
