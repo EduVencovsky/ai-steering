@@ -97,3 +97,33 @@ Correct way:
   "foo": "Foo"
 }
 ```
+
+## Use string interpolation instead of concatenating multiple strings
+
+You can create a translation that will receive a parameter that will be used to render inside the string by passing `{{foo}}`. When need to render strings with non hardcoded values, always create a translation with a parameter instead of concatenating multiple strings.
+
+Wrong way:
+
+```ts
+const count = /* ... */;
+const `${t("fooEquals")} ${count}`
+```
+
+```json
+{
+  "fooEquals": "Foo ="
+}
+```
+
+Correct way:
+
+```ts
+const count = /* ... */;
+const t("fooEquals", { count })
+```
+
+```json
+{
+  "fooEquals": "Foo = {{count}}"
+}
+```
