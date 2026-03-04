@@ -1,5 +1,244 @@
 
 
+# Amplify V2 Data Guidelines
+
+When using AWS Amplify V2 and generating data schema, always follow these guidelines.
+
+## Use `selectionSet` to fetch related data
+
+When making any call to CRUDL + observeQuery APIs, you can pass `selectionSet` to get related schema data.
+
+When passing the `selectionSet` parameter, you must always define a type with `SelectionSet` so it can correctly infer the type for the fields.
+
+```ts
+// src/model/foo.ts
+import { type SelectionSet } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+
+export type Foo = Schema["Foo"]["type"];
+export type FooIdentifier = Schema["Foo"]["identifier"];
+
+// Use selectionSet to define which fields to load.
+const fooWithBarBazSelectionSet = [
+  "id",
+  "name",
+  "bar.id",
+  "bar.name",
+  "baz.*",
+] as const;
+export type FooWithBarBaz = SelectionSet<Foo, typeof fooWithBarBazSelectionSet>;
+```
+
+```ts
+import { generateClient } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+import { type FooIdentifier, type FooWithBarBaz } from "@/model/foo";
+
+const client = generateClient<Schema>();
+
+// Use selectionSet to define which fields to load.
+const selectionSet = ["id", "name", "bar.id", "bar.name", "baz.*"] as const;
+
+/**
+ * Gets foo with bar and baz
+ */
+const getFooWithBarBaz = async (
+  identifier: FooIdentifier,
+): Promise<FooWithBarBaz | null> => {
+  // Passing selectionSet to be able to get different set of fields
+  const result = await client.models.Foo.get(identifier, { selectionSet });
+
+  return result.data;
+};
+```
+
+## Always infer the TypeScript types from the generated schemas
+
+Never create interfaces or types that can be inferred from the schema. Use model files to re-export schema-inferred types, then import from those model files.
+
+### Use model files to re-export schema-inferred types
+
+Create model files in `src/model/` to centralize type exports. These files must only re-export types inferred from the schema, never define custom interfaces.
+
+Correct way:
+
+```ts
+// src/model/foo.ts
+import { type SelectionSet } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+
+export type Foo = Schema["Foo"]["type"];
+export type FooIdentifier = Schema["Foo"]["identifier"];
+export type FooCreateInput = Schema["Foo"]["createType"];
+export type FooUpdateInput = Schema["Foo"]["updateType"];
+export type FooDeleteInput = Schema["Foo"]["deleteType"];
+
+// Use selectionSet to define which fields to load.
+const fooWithBarBazSelectionSet = [
+  "id",
+  "name",
+  "bar.id",
+  "bar.name",
+  "baz.*",
+] as const;
+export type FooWithBarBaz = SelectionSet<Foo, typeof fooWithBarBazSelectionSet>;
+```
+
+Wrong way:
+
+```ts
+// src/model/foo.ts
+
+// ❌ Do not create custom interfaces
+export type FooFormInput = {
+  name: string;
+  description?: string | null;
+};
+```
+
+### Always use `createType` type for inputs to create
+
+When creating a new item, always use the `createType` for the input type.
+
+Correct way:
+
+```ts
+import { generateClient } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+import { type Foo, type FooCreateInput } from "@/model/foo";
+
+const client = generateClient<Schema>();
+
+/**
+ * Creates foo
+ */
+const createFoo = async (fooInput: FooCreateInput): Promise<Foo> => {
+  const result = await client.models.Foo.create(fooInput);
+
+  return result.data;
+};
+```
+
+### Always use the `identifier` type for getting an item by id
+
+When getting an item by id, always use the `identifier` type to define the parameters to get the item.
+
+Correct way:
+
+```ts
+import { generateClient } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+import { type Foo, type FooIdentifier } from "@/model/foo";
+
+const client = generateClient<Schema>();
+
+/**
+ * Gets foo
+ */
+const getFoo = async (identifier: FooIdentifier): Promise<Foo | null> => {
+  const result = await client.models.Foo.get(identifier);
+
+  return result.data;
+};
+```
+
+### Always use the `updateType` type for the parameters to update an item
+
+When updating an item, always use the `updateType` to define the parameters to update the item.
+
+Correct way:
+
+```ts
+import { generateClient } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+import { type Foo, type FooUpdateInput } from "@/model/foo";
+
+const client = generateClient<Schema>();
+
+/**
+ * Updates foo
+ */
+const updateFoo = async (fooInput: FooUpdateInput): Promise<Foo> => {
+  const result = await client.models.Foo.update(fooInput);
+
+  return result.data;
+};
+```
+
+### Always use the `deleteType` type for the parameters to delete an item
+
+When deleting an item, always use the `deleteType` to define the parameters to delete the item.
+
+Correct way:
+
+```ts
+import { generateClient } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+import { type Foo, type FooDeleteInput } from "@/model/foo";
+
+const client = generateClient<Schema>();
+
+/**
+ * Deletes foo
+ */
+const deleteFoo = async (fooInput: FooDeleteInput): Promise<Foo> => {
+  const result = await client.models.Foo.delete(fooInput);
+
+  return result.data;
+};
+```
+
+## Use underscores instead of hyphens in enum values
+
+GraphQL enum values cannot contain hyphens. Use underscores instead.
+
+Wrong way:
+
+```ts
+type: a.enum(["youtube-video", "my-value"]);
+```
+
+Correct way:
+
+```ts
+type: a.enum(["youtube_video", "my_value"]);
+```
+
+## Prevent Owner Reassignment
+
+When using owner-based authorization (allow.owner()), Amplify automatically creates a hidden owner field. By default, owners have permission to update this field, which allows them to reassign record ownership to other users.
+To prevent this security risk, you must always explicitly define the owner field and restrict its update permissions.
+
+Wrong way:
+
+```ts
+const schema = a.schema({
+  Todo: a
+    .model({
+      content: a.string(),
+    })
+    .authorization((allow) => [
+      allow.owner(), // Implicitly allows the owner to update the hidden 'owner' field
+    ]),
+});
+```
+
+Correct way:
+
+```ts
+const schema = a.schema({
+  Todo: a
+    .model({
+      content: a.string(),
+      // Explicitly define the owner field to restrict permissions
+      owner: a.string().authorization((allow) => [
+        allow.owner().to(["read", "delete"]), // Omit 'update' to prevent reassignment
+      ]),
+    })
+    .authorization((allow) => [allow.owner()]),
+});
+```
+
 # Coding guidelines
 
 For code you write, follow these guidelines
@@ -124,6 +363,36 @@ try {
 }
 ```
 
+# File Structure Guidelines
+
+When managing files, always follow these guidelines
+
+## Always use Kebab Case when creating folder
+
+For any folders, always use kebab case
+
+Wrong way:
+
+- MyFolder/
+- myFolder/
+
+Correct way:
+
+- my-folder/
+
+## Always use Kebab Case when creating Javascript or Typescript files
+
+Always use Kebab Case when creating a new file with the following extesions ".js", ".jsx", ".ts", ".tsx"
+
+Wrong way:
+
+- MyButton.tsx
+- myButton.tsx
+
+Correct way:
+
+- my-button.tsx
+
 # Firestore Rules Security Guidelines
 
 You should always follow these rules when changing firestore rules. They are usually stored in a file called `firestore.rules` file
@@ -221,6 +490,72 @@ await setDoc(userRef, {
 // ✅ Access the generated ID
 console.log("Created document with ID:", userRef.id);
 ```
+
+# React Component Structure Guidelines
+
+Always follow these guidelines when creating new React components.
+
+## File for React component that renders visual elements and receives the state or data
+
+A presentational component focused only on rendering UI elements based on the props it receives.
+
+Can be reused anywhere and doesn't rely on any react context. These components should be a pure like pure functions.
+
+```tsx
+import React from "react";
+
+export interface BarProps {
+  bar: Bar;
+  onRefresh: () => void;
+}
+
+export const Bar = ({ bar, onRefresh }: BarProps) => (
+  <div>
+    <h2>Foo Details</h2>
+    <button onClick={onRefresh}>Refresh</button>
+    <pre>{bar}</pre>
+  </div>
+);
+```
+
+## React component that handles the state and API data
+
+Manages component logic, state, and data fetching. Passes data and handlers as props to the visual component.
+
+Will receive few props and will be calling most of the hooks for state or API data.
+
+```tsx
+import React from "react";
+import { useFoo } from "../hooks/useFoo";
+import { Bar } from "../components/Bar";
+
+export interface FooProps {
+  id: string;
+}
+
+export const Foo = ({ id }: FooProps) => {
+  const { data: foo, isLoading, isError, refetch } = useFoo(id);
+
+  if (isLoading) return <p>Loading...</p>;
+  if (isError) return <p>Error loading data.</p>;
+  if (!foo) return <p>No data found.</p>;
+
+  return <Bar bar={foo} onRefresh={refetch} />;
+};
+```
+
+## Reusable components that uses API data
+
+Some components can be reusable and will required API calls to be made.
+
+For example, imagine that you have a drop down form field that lists certain resources.
+
+In this scenario, instead of passing down props for the API call data in multiple places where this component is reused, it's fine to make a reusable component that has the API call logic inside.
+
+Follow this logic:
+
+- If the component is reused in multiple places and require API calls: Make the component call the API inside of it (following existing guidelines on how to get data from API)
+- If the component is only used in a singel place and require API calls: Make the component receive the value of the API call from props
 
 # React Hook Form Guidelines
 
@@ -522,6 +857,115 @@ export const useCreateFoo = () => {
     // ...
   });
 };
+```
+
+# TanStack Router Breadcrumb Guidelines
+
+When creating routes with TanStack Router, follow these guidelines for breadcrumbs.
+
+## Always create a parent layout route for nested routes
+
+When creating a new route section (e.g., `/foo`, `/bar`), always create a parent layout file that defines the breadcrumb and renders an `<Outlet />`.
+
+Wrong way (missing parent layout):
+
+```
+src/routes/
+  foo/
+    index.tsx      # /foo page
+    $fooId.tsx     # /foo/:fooId layout
+```
+
+Correct way:
+
+```
+src/routes/
+  foo.tsx          # Parent layout with breadcrumb
+  foo/
+    index.tsx      # /foo page
+    $fooId.tsx     # /foo/:fooId layout
+```
+
+## Parent layout route structure
+
+The parent layout route must:
+1. Define a `loader` that returns a `crumb` property
+2. Render an `<Outlet />` component
+
+```tsx
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/foo")({
+  component: RouteComponent,
+  loader: () => {
+    return {
+      crumb: "Foo",
+    };
+  },
+});
+
+function RouteComponent() {
+  return <Outlet />;
+}
+```
+
+## Dynamic breadcrumbs for detail pages
+
+For routes with dynamic parameters, fetch the data in the loader to display a meaningful breadcrumb.
+
+```tsx
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { getFooQueryOptions } from "@/hooks/foo/use-foo";
+
+export const Route = createFileRoute("/foo/$fooId")({
+  component: RouteComponent,
+  loader: async ({ params: { fooId }, context }) => {
+    return {
+      crumb: (
+        await context.queryClient.ensureQueryData(getFooQueryOptions(fooId))
+      )?.title,
+    };
+  },
+});
+
+function RouteComponent() {
+  return <Outlet />;
+}
+```
+
+## Create pages need breadcrumbs
+
+Standalone create pages (e.g., `/foo-create`, `/bar-create`) are leaf routes and should define a `crumb` in their loader.
+
+```tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/foo-create")({
+  component: FooCreatePage,
+  loader: () => ({ crumb: "Create Foo" }),
+});
+
+function FooCreatePage() {
+  return <div>...</div>;
+}
+```
+
+## Edit routes under detail pages
+
+Edit routes should be nested under the detail route (e.g., `/foo/$fooId/edit`). Define the breadcrumb directly in the edit route file.
+
+```tsx
+// src/routes/foo/$fooId/edit.tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/foo/$fooId/edit")({
+  component: RouteComponent,
+  loader: () => ({ crumb: "Edit" }),
+});
+
+function RouteComponent() {
+  return <div>...</div>;
+}
 ```
 
 # Tanstack Router Guidelines
