@@ -239,6 +239,263 @@ const schema = a.schema({
 });
 ```
 
+## Understand list nullability in generated TypeScript types
+
+Amplify Gen 2 generates TypeScript types based on GraphQL nullability rules. For list fields, there are two separate “required” concepts:
+
+- **Is the list itself required?** (can the entire field be `null` / omitted?)
+- **Are the items inside the list required?** (can an element inside the array be `null`?)
+
+If you only mark the list field as required, Amplify may still generate list item types as nullable, resulting in types like:
+
+`Nullable<string>[] | undefined`
+
+Wrong way (list required, items can still be nullable):
+
+```ts
+interests: a.string().array().required(),
+```
+
+Correct way (make items required _and_ the list required):
+
+```ts
+interests: a.string().required().array().required(),
+```
+
+## Use Amplify secrets for sensitive environment variables
+
+Never hardcode API keys, tokens, or other secrets in code or plain environment variables. Always use Amplify's `secret()` function to reference secrets stored in AWS SSM Parameter Store.
+
+Set secrets via the CLI for sandbox environments and via the Amplify console for production branches.
+
+Wrong way:
+
+```ts
+// ❌ Do not hardcode secrets
+const myHandler = defineFunction({
+  name: "my-handler",
+  entry: "./my-handler/handler.ts",
+  environment: {
+    API_KEY: "sk-1234567890abcdef",
+  },
+});
+```
+
+Correct way:
+
+```ts
+import { defineFunction, secret } from "@aws-amplify/backend";
+
+const myHandler = defineFunction({
+  name: "my-handler",
+  entry: "./my-handler/handler.ts",
+  environment: {
+    API_KEY: secret("API_KEY"),
+  },
+});
+```
+
+Setting the secret for sandbox:
+
+```bash
+npx ampx sandbox secret set API_KEY
+```
+
+For production branches, set secrets via the Amplify console under the environment's secret management.
+
+In the Lambda handler, read the secret from `process.env`:
+
+```ts
+const apiKey = process.env.API_KEY;
+```
+
+## Use custom queries for Lambda functions instead of CDK API Gateway stacks
+
+When you need a Lambda function that the frontend can call (e.g., proxying an external API, running custom business logic), always use Amplify's built-in custom queries (`a.query()`) backed by `a.handler.function()` in the data schema. Do not create custom CDK stacks with API Gateway, REST API, or HTTP API constructs.
+
+Custom queries use the existing AppSync endpoint, existing Cognito auth, and the existing `generateClient<Schema>()` pattern. No extra infrastructure, no CORS configuration, no manual auth token management.
+
+### Define the function and queries in `amplify/data/resource.ts`
+
+Use `defineFunction` with `entry` pointing to the handler file and `secret()` for sensitive environment variables. Define custom queries in the schema with `a.handler.function()`.
+
+Correct way:
+
+```ts
+import {
+  type ClientSchema,
+  a,
+  defineData,
+  defineFunction,
+  secret,
+} from "@aws-amplify/backend";
+
+const myHandler = defineFunction({
+  name: "my-handler",
+  entry: "./my-handler/handler.ts",
+  environment: {
+    MY_SECRET: secret("MY_SECRET"),
+  },
+});
+
+const schema = a.schema({
+  myQuery: a
+    .query()
+    .arguments({ id: a.string().required() })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(myHandler)),
+});
+```
+
+Wrong way:
+
+```ts
+// ❌ Do not create CDK stacks with API Gateway
+import { Stack } from "aws-cdk-lib";
+import { RestApi, LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
+
+const apiStack = backend.createStack("MyApiStack");
+const restApi = new RestApi(apiStack, "MyApi", { /* ... */ });
+```
+
+### Place handler files under `amplify/data/`
+
+Handler files for custom queries go under `amplify/data/<handler-name>/`. Do not create an `amplify/functions/` directory for handlers that are used by custom queries.
+
+Correct way:
+
+```
+amplify/data/
+  my-handler/
+    handler.ts
+    helper.ts
+  resource.ts
+```
+
+Wrong way:
+
+```
+amplify/functions/
+  my-handler/
+    resource.ts
+    handler.ts
+```
+
+### Call custom queries from the frontend using `generateClient`
+
+Use the existing `generateClient<Schema>()` pattern to call custom queries. Do not use `get()` from `aws-amplify/api` or plain `fetch` with manual auth tokens.
+
+Correct way:
+
+```ts
+import { generateClient } from "aws-amplify/data";
+import { type Schema } from "../../amplify/data/resource";
+
+const client = generateClient<Schema>();
+
+const result = await client.queries.myQuery({ id: "abc" });
+```
+
+Wrong way:
+
+```ts
+// ❌ Do not use REST API client for Lambda calls
+import { get } from "aws-amplify/api";
+
+const response = await get({
+  apiName: "myApi",
+  path: "/my-endpoint",
+  options: { queryParams: { id: "abc" } },
+}).response;
+```
+
+### Do not modify `amplify/backend.ts` for Lambda functions
+
+The `backend.ts` file should only contain `defineBackend` with the standard resources (auth, data, etc.) and any CDK overrides for those resources. Lambda functions used by custom queries are defined in `amplify/data/resource.ts` and do not need to be added to `defineBackend`.
+
+### Define return types in the schema and reuse them in the handler
+
+Always define the return type of a custom query using `a.customType()` or `a.ref()` in the schema. The handler must use the schema-inferred type (`Schema["myQuery"]["functionHandler"]`) so the return type is type-safe from the Lambda handler all the way to the frontend client call.
+
+```ts
+// amplify/data/resource.ts
+const schema = a.schema({
+  FooResponse: a.customType({
+    id: a.string().required(),
+    name: a.string().required(),
+    count: a.integer(),
+  }),
+
+  getFoo: a
+    .query()
+    .arguments({ id: a.string().required() })
+    .returns(a.ref("FooResponse"))
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(myHandler)),
+});
+```
+
+```ts
+// amplify/data/my-handler/handler.ts
+import type { Schema } from "../resource";
+
+export const handler: Schema["getFoo"]["functionHandler"] = async (event) => {
+  // Return type is enforced by the schema-inferred type
+  return { id: event.arguments.id, name: "Example", count: 42 };
+};
+```
+
+### Share one Lambda across multiple custom queries
+
+When multiple custom queries use the same underlying logic (e.g., different endpoints of the same external API), define one `defineFunction` and reference it in all queries. The handler routes based on `event.fieldName`.
+
+```ts
+const sharedHandler = defineFunction({
+  name: "my-proxy",
+  entry: "./my-proxy/handler.ts",
+  environment: { API_KEY: secret("API_KEY") },
+});
+
+const schema = a.schema({
+  getFoo: a
+    .query()
+    .arguments({ id: a.string().required() })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(sharedHandler)),
+
+  getBar: a
+    .query()
+    .arguments({ name: a.string().required() })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(sharedHandler)),
+});
+```
+
+```ts
+// amplify/data/my-proxy/handler.ts
+export const handler = async (event) => {
+  switch (event.fieldName) {
+    case "getFoo":
+      return await getFoo(event.arguments.id);
+    case "getBar":
+      return await getBar(event.arguments.name);
+    default:
+      throw new Error(`Unknown query: ${event.fieldName}`);
+  }
+};
+```
+
+# code-language.md
+
+Always write code in English.
+All files should be written in English.
+All file names should be in English.
+If you see code in other languages, change to English.
+It is ok to have other languages in the translations files for i18n.
+
 # Coding guidelines
 
 For code you write, follow these guidelines
@@ -360,6 +617,48 @@ try {
 } catch (err) {
   console.error(err); // ✅ Log technical error for developers
   setError("Something went wrong while loading your profile."); // ✅ Friendly message
+}
+```
+
+## Preserve page layout when displaying errors
+
+When showing an error, never replace the entire page with just the error message. Keep the page structure intact (header, navigation, sidebar, etc.) and display the error within the content area.
+
+Wrong example:
+
+```tsx
+function MyPage() {
+  const { data, error } = useGetData();
+
+  if (error) {
+    // ❌ Replaces entire page with just the error
+    return <ErrorMessage message="Something went wrong" />;
+  }
+
+  return (
+    <Layout>
+      <Header />
+      <Content>{data}</Content>
+    </Layout>
+  );
+}
+```
+
+Correct example:
+
+```tsx
+function MyPage() {
+  const { data, error } = useGetData();
+
+  return (
+    <Layout>
+      <Header />
+      <Content>
+        {/* ✅ Error displayed within the page layout */}
+        {error ? <ErrorMessage message="Something went wrong" /> : data}
+      </Content>
+    </Layout>
+  );
 }
 ```
 
@@ -491,6 +790,18 @@ await setDoc(userRef, {
 console.log("Created document with ID:", userRef.id);
 ```
 
+# Guidelines when using Npm or Npx
+
+Follow these guidelines when running any command with `npm` or `npx`
+
+## Always use script for package.json first
+
+If you want to run a command, always look for the scripts in `package.json` and use those scripts instead of running raw `npx` commands
+
+## Errors are errors independently of status code
+
+If a command shows errors, but the status code is not of an error, treat it as failing and fix the errors.
+
 # React Component Structure Guidelines
 
 Always follow these guidelines when creating new React components.
@@ -556,6 +867,14 @@ Follow this logic:
 
 - If the component is reused in multiple places and require API calls: Make the component call the API inside of it (following existing guidelines on how to get data from API)
 - If the component is only used in a singel place and require API calls: Make the component receive the value of the API call from props
+
+**Keep internal UI state in the presentational
+component.** State that only controls how the UI is
+displayed (e.g., which step is active, whether a
+section is expanded, animation state) should stay in
+the presentational component. The container should only
+manage state that involves API data, form setup, or
+data that needs to be shared across components.
 
 # React Hook Form Guidelines
 
@@ -648,9 +967,13 @@ const Foo = () => {
 };
 ```
 
+## Always translate untranslated text messages to users
+
+If while reading a file, you see a message that is not translated and it's displayed to users, ALWAYS translate it, even if it's not something you have touched. Be proactive in translating user facing messages.
+
 ## When adding new translations, always translate them in all languages
 
-When adding new translations, always translate them in all languages. Translation files are stored in a json file.
+When adding new translations, always translate them in all languages. Translation files are stored in `.ts` files.
 
 ## Always use lowercase separated by `-` for the translation keys
 
@@ -731,6 +1054,18 @@ const t("fooEquals", { count })
 }
 ```
 
+
+## Always use correct Portuguese in pt-BR translations
+
+When writing or reviewing pt-BR translation values, always use proper Portuguese with correct accents and special characters. Never omit accents or use unaccented substitutes.
+
+Common mistakes to avoid:
+- Missing accents: `nao` → `não`, `voce` → `você`, `esta` → `está`, `e` → `é`, `Gratis` → `Grátis`
+- Missing cedilla: `Organizacao` → `Organização`, `execucao` → `execução`, `informacoes` → `informações`, `certificacao` → `certificação`
+- Missing acute accents: `topico` → `tópico`, `pratica` → `prática`, `revisao` → `revisão`, `conclusao` → `conclusão`, `Metricas` → `Métricas`
+- Missing circumflex: `voce` → `você`, `esta` → `está`
+- Missing tilde: `nao` → `não`, `manutencao` → `manutenção`
+
 # React guidelines
 
 When using `react`, always follow these guidelines
@@ -787,6 +1122,65 @@ Run the following command to see available components to add:
 
 ```bash
 npx --yes shadcn@latest list @shadcn
+```
+
+## Use shadcn/ui Form primitives for consistent field UI
+
+When building forms with shadcn/ui, always use the shadcn **Form primitives** (typically alongside react-hook-form) to keep spacing, typography, accessibility semantics, and validation messaging consistent across the app.
+
+### Wrap form-like UI in `<Form>`
+
+Even in multi-step wizards, wrap the interactive area so child form elements follow the same conventions.
+
+```tsx
+<Card className="p-6">
+  <Form {...form}>{/* step content */}</Form>
+</Card>
+```
+
+### Structure each field with `FormItem`, `FormLabel`, `FormDescription`, and `FormMessage`
+
+Every input block (toggles, checkboxes, sliders, etc.) should follow the same pattern:
+
+- **`FormItem`**: consistent spacing/layout
+- **`FormLabel`**: field title
+- **`FormDescription`**: helper/optional hint
+- **Control UI**: your input component(s)
+- **`FormMessage`**: reserved space for validation/error text
+
+Wrong way:
+
+```tsx
+Wrong way (ad-hoc markup + inconsistent error handling):
+
+<div className="space-y-4">
+  {/* Don't use heading for labels */}
+  <h2 className="text-lg font-semibold">Days</h2>
+  {/* Don't use p for descriptions */}
+  <p className="text-sm text-muted-foreground">Optional</p>
+
+  {/* control UI here */}
+
+  {/* ❌ No FormMessage slot; errors end up inconsistent/jumpy */}
+  {hasError && (
+    <p className="text-sm text-destructive">
+      Something went wrong.
+    </p>
+  )}
+</div>
+```
+
+Correct way:
+
+```tsx
+<FormItem className="space-y-4">
+  <FormLabel className="text-lg font-semibold">Days</FormLabel>
+  <FormDescription>Optional</FormDescription>
+
+  {/* control UI here */}
+
+  <FormMessage />
+</FormItem>
 ```
 
 # React Query Guidelines

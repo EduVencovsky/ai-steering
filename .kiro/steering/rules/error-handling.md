@@ -75,3 +75,45 @@ try {
   setError("Something went wrong while loading your profile."); // ✅ Friendly message
 }
 ```
+
+## Preserve page layout when displaying errors
+
+When showing an error, never replace the entire page with just the error message. Keep the page structure intact (header, navigation, sidebar, etc.) and display the error within the content area.
+
+Wrong example:
+
+```tsx
+function MyPage() {
+  const { data, error } = useGetData();
+
+  if (error) {
+    // ❌ Replaces entire page with just the error
+    return <ErrorMessage message="Something went wrong" />;
+  }
+
+  return (
+    <Layout>
+      <Header />
+      <Content>{data}</Content>
+    </Layout>
+  );
+}
+```
+
+Correct example:
+
+```tsx
+function MyPage() {
+  const { data, error } = useGetData();
+
+  return (
+    <Layout>
+      <Header />
+      <Content>
+        {/* ✅ Error displayed within the page layout */}
+        {error ? <ErrorMessage message="Something went wrong" /> : data}
+      </Content>
+    </Layout>
+  );
+}
+```

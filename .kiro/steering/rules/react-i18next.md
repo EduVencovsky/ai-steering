@@ -45,9 +45,13 @@ const Foo = () => {
 };
 ```
 
+## Always translate untranslated text messages to users
+
+If while reading a file, you see a message that is not translated and it's displayed to users, ALWAYS translate it, even if it's not something you have touched. Be proactive in translating user facing messages.
+
 ## When adding new translations, always translate them in all languages
 
-When adding new translations, always translate them in all languages. Translation files are stored in a json file.
+When adding new translations, always translate them in all languages. Translation files are stored in `.ts` files.
 
 ## Always use lowercase separated by `-` for the translation keys
 
@@ -127,3 +131,15 @@ const t("fooEquals", { count })
   "fooEquals": "Foo = {{count}}"
 }
 ```
+
+
+## Always use correct Portuguese in pt-BR translations
+
+When writing or reviewing pt-BR translation values, always use proper Portuguese with correct accents and special characters. Never omit accents or use unaccented substitutes.
+
+Common mistakes to avoid:
+- Missing accents: `nao` → `não`, `voce` → `você`, `esta` → `está`, `e` → `é`, `Gratis` → `Grátis`
+- Missing cedilla: `Organizacao` → `Organização`, `execucao` → `execução`, `informacoes` → `informações`, `certificacao` → `certificação`
+- Missing acute accents: `topico` → `tópico`, `pratica` → `prática`, `revisao` → `revisão`, `conclusao` → `conclusão`, `Metricas` → `Métricas`
+- Missing circumflex: `voce` → `você`, `esta` → `está`
+- Missing tilde: `nao` → `não`, `manutencao` → `manutenção`

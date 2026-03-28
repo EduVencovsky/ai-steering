@@ -63,3 +63,11 @@ Follow this logic:
 
 - If the component is reused in multiple places and require API calls: Make the component call the API inside of it (following existing guidelines on how to get data from API)
 - If the component is only used in a singel place and require API calls: Make the component receive the value of the API call from props
+
+**Keep internal UI state in the presentational
+component.** State that only controls how the UI is
+displayed (e.g., which step is active, whether a
+section is expanded, animation state) should stay in
+the presentational component. The container should only
+manage state that involves API data, form setup, or
+data that needs to be shared across components.
