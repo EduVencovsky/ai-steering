@@ -2,16 +2,6 @@
 
 When using shadcn, follow these guidelines
 
-## Importing components
-
-You can import shadcn components from: `@/components/ui/`
-
-Example:
-
-```tsx
-import { Foo } from "@/components/ui/foo";
-```
-
 ## Always use Shadcn components
 
 Always use shadcn components. Do not render raw html or raw css if you have a shadcn component available for it,

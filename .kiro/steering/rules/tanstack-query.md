@@ -36,6 +36,8 @@ export const createFoo = async (data: Foo): Promise<Bar> => {
 
 Encapsulates API fetching logic using `useQuery` or `useMutation` from React Query. Keeps data management separate from components.
 
+You must always use `queryOptions`
+
 Example for `useQuery`:
 
 ```ts
